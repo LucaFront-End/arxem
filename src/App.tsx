@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar, ActiveRoute } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { HomeView } from './views/HomeView';
@@ -18,8 +18,96 @@ import {
 } from './data/catalogData';
 import { getSavedCMSQuotes, CMSQuoteRecord } from './data/taxonomyData';
 
+const DEFAULT_PRODUCT =
+  CATALOG_PRODUCTS.find((p) => p.id.includes('b2c5150a')) || CATALOG_PRODUCTS[0];
+
+function slugifyProduct(product: CatalogProduct): string {
+  const base = (product.slug || product.name)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  const shortId = product.id.slice(0, 8);
+  return `${base}-${shortId}`;
+}
+
+function parsePathname(pathname: string): {
+  route: ActiveRoute;
+  product: CatalogProduct;
+} {
+  const clean = pathname.replace(/\/+$/, '') || '/';
+
+  if (clean === '/' || clean === '/home') {
+    return { route: 'home', product: DEFAULT_PRODUCT };
+  }
+  if (clean === '/tienda') {
+    return { route: 'tienda', product: DEFAULT_PRODUCT };
+  }
+  if (clean === '/nosotros') {
+    return { route: 'nosotros', product: DEFAULT_PRODUCT };
+  }
+  if (clean === '/vidrio-personalizado') {
+    return { route: 'vidrio-personalizado', product: DEFAULT_PRODUCT };
+  }
+  if (clean === '/blindaje-personalizado') {
+    return { route: 'blindaje-personalizado', product: DEFAULT_PRODUCT };
+  }
+  if (clean === '/campana-vidrio' || clean === '/vidrio-emplomado') {
+    return { route: 'campana-vidrio', product: DEFAULT_PRODUCT };
+  }
+  if (clean === '/contacto') {
+    return { route: 'contacto', product: DEFAULT_PRODUCT };
+  }
+  if (clean.startsWith('/producto')) {
+    const slugPart = clean.replace(/^\/producto\/?/, '');
+    if (slugPart) {
+      const matched = CATALOG_PRODUCTS.find(
+        (p) =>
+          slugifyProduct(p) === slugPart ||
+          p.id === slugPart ||
+          slugPart.endsWith(p.id.slice(0, 8)) ||
+          p.slug === slugPart
+      );
+      if (matched) {
+        return { route: 'producto', product: matched };
+      }
+    }
+    return { route: 'producto', product: DEFAULT_PRODUCT };
+  }
+
+  return { route: 'home', product: DEFAULT_PRODUCT };
+}
+
+function buildUrlForRoute(route: ActiveRoute, product?: CatalogProduct): string {
+  switch (route) {
+    case 'home':
+      return '/';
+    case 'tienda':
+      return '/tienda';
+    case 'nosotros':
+      return '/nosotros';
+    case 'vidrio-personalizado':
+      return '/vidrio-personalizado';
+    case 'blindaje-personalizado':
+      return '/blindaje-personalizado';
+    case 'campana-vidrio':
+      return '/campana-vidrio';
+    case 'contacto':
+      return '/contacto';
+    case 'producto':
+      return `/producto/${slugifyProduct(product || DEFAULT_PRODUCT)}`;
+    default:
+      return '/';
+  }
+}
+
 export function App() {
-  const [activeRoute, setActiveRoute] = useState<ActiveRoute>('home');
+  const initialLocation = parsePathname(
+    typeof window !== 'undefined' ? window.location.pathname : '/'
+  );
+
+  const [activeRoute, setActiveRoute] = useState<ActiveRoute>(initialLocation.route);
   const [storeFilter, setStoreFilter] = useState<{
     pillar?: StorePillar;
     category?: string;
@@ -28,7 +116,7 @@ export function App() {
   }>({ pillar: 'catalogo-general' });
 
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct>(
-    CATALOG_PRODUCTS.find((p) => p.id.includes('b2c5150a')) || CATALOG_PRODUCTS[0]
+    initialLocation.product
   );
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -44,37 +132,69 @@ export function App() {
     return () => window.removeEventListener('arxem-cms-updated', refreshCMS);
   }, []);
 
-  const handleNavigate = (
-    route: ActiveRoute,
-    options?: {
-      pillar?: StorePillar;
-      category?: string;
-      subcategory?: string;
-      sector?: SectorSlug;
-      productId?: string;
-    }
-  ) => {
-    if (options && route === 'tienda') {
-      setStoreFilter({
-        pillar: options.pillar || 'catalogo-general',
-        category: options.category,
-        subcategory: options.subcategory,
-        sector: options.sector
-      });
-    }
-    if (options?.productId) {
-      const found = CATALOG_PRODUCTS.find((p) => p.id === options.productId);
-      if (found) setSelectedProduct(found);
-    }
-    setActiveRoute(route);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  // Sync browser Back / Forward navigation (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const parsed = parsePathname(window.location.pathname);
+      setActiveRoute(parsed.route);
+      if (parsed.route === 'producto') {
+        setSelectedProduct(parsed.product);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-  const handleSelectProduct = (product: CatalogProduct) => {
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleNavigate = useCallback(
+    (
+      route: ActiveRoute,
+      options?: {
+        pillar?: StorePillar;
+        category?: string;
+        subcategory?: string;
+        sector?: SectorSlug;
+        productId?: string;
+      }
+    ) => {
+      if (options && route === 'tienda') {
+        setStoreFilter({
+          pillar: options.pillar || 'catalogo-general',
+          category: options.category,
+          subcategory: options.subcategory,
+          sector: options.sector
+        });
+      }
+
+      let targetProd = selectedProduct;
+      if (options?.productId) {
+        const found = CATALOG_PRODUCTS.find((p) => p.id === options.productId);
+        if (found) {
+          targetProd = found;
+          setSelectedProduct(found);
+        }
+      }
+
+      setActiveRoute(route);
+      const nextUrl = buildUrlForRoute(route, targetProd);
+      if (window.location.pathname !== nextUrl) {
+        window.history.pushState({ route }, '', nextUrl);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [selectedProduct]
+  );
+
+  const handleSelectProduct = useCallback((product: CatalogProduct) => {
     setSelectedProduct(product);
     setActiveRoute('producto');
+    const nextUrl = buildUrlForRoute('producto', product);
+    if (window.location.pathname !== nextUrl) {
+      window.history.pushState({ route: 'producto', productId: product.id }, '', nextUrl);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
   const handleAddToCart = (
     product: CatalogProduct,
@@ -221,4 +341,3 @@ export function App() {
   );
 }
 export default App;
-
