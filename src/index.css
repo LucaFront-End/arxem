@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #F7F7F4;
+    --foreground: #0D1117;
+    --color-background: #F7F7F4;
+    --color-foreground: #0D1117;
+    --color-muted-foreground: #525866;
+    --color-primary: #0052FF;
+    --muted: #EAE8E1;
+    --muted-foreground: #525866;
+    --border: rgba(13, 17, 23, 0.12);
+    --ring: #0052FF;
+    --bg-primary: #F7F7F4;
+    --bg-surface: #FFFFFF;
+    --ink-primary: #0D1117;
+    --accent-cobalt: #0052FF;
+    --accent-amber: #D97706;
+  }
+
+  .dark {
+    --background: #0A0E14;
+    --foreground: #F8FAFC;
+    --color-background: #0A0E14;
+    --color-foreground: #F8FAFC;
+    --color-muted-foreground: #94A3B8;
+    --color-primary: #38BDF8;
+    --muted: #161F2C;
+    --muted-foreground: #94A3B8;
+    --border: rgba(255, 255, 255, 0.14);
+    --ring: #38BDF8;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Geist', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+}
+
+/* Architectural Millimeter Dosimetry Grid */
+.bg-clinical-grid {
+  background-size: 48px 48px;
+  background-image: 
+    linear-gradient(to right, rgba(13, 17, 23, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(13, 17, 23, 0.045) 1px, transparent 1px);
+}
+
+.bg-clinical-subgrid {
+  background-size: 12px 12px;
+  background-image: 
+    linear-gradient(to right, rgba(13, 17, 23, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(13, 17, 23, 0.02) 1px, transparent 1px);
+}
+
+.bg-xray-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 82, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 82, 255, 0.14) 1px, transparent 1px);
+}
+
+/* Lead Glass Refractive Surface */
+.lead-glass-panel {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(240, 245, 255, 0.72) 100%);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(13, 17, 23, 0.08);
+  box-shadow: 
+    0 20px 50px -12px rgba(13, 17, 23, 0.06),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F0EFEA;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C4C2B8;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0052FF;
+}
