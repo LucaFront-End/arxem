@@ -1,7 +1,35 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/catalog-feed/meta.xml",
+      "destination": "/api/feed?marketplace=facebook&format=xml"
+    },
+    {
+      "source": "/catalog-feed/meta.csv",
+      "destination": "/api/feed?marketplace=facebook&format=csv"
+    },
+    {
+      "source": "/catalog-feed/meta.tsv",
+      "destination": "/api/feed?marketplace=facebook&format=tsv"
+    },
+    {
+      "source": "/catalog-feed/merchant.tsv",
+      "destination": "/api/feed?marketplace=google&format=tsv"
+    },
+    {
+      "source": "/catalog-feed/merchant.xml",
+      "destination": "/api/feed?marketplace=google&format=xml"
+    },
+    {
+      "source": "/catalog-feed/merchant.csv",
+      "destination": "/api/feed?marketplace=google&format=csv"
+    },
+    {
+      "source": "/catalog-feed/v1/feed.tsv",
+      "destination": "/api/feed?format=tsv"
+    },
+    {
+      "source": "/((?!api/|catalog-feed/).*)",
       "destination": "/index.html"
     }
   ]

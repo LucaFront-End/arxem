@@ -25,6 +25,21 @@ import {
   openWhatsAppWithQuote
 } from '../data/taxonomyData';
 import { ActiveRoute } from '../components/Navbar';
+import { trackViewContent, trackLeadQuote } from '../lib/metaPixel';
+
+function resolveInitialVariant(product: CatalogProduct): ProductVariant | null {
+  if (product.variants.length === 0) return null;
+  if (typeof window !== 'undefined') {
+    const variantParam = new URLSearchParams(window.location.search).get('variant');
+    if (variantParam) {
+      const matched = product.variants.find(
+        (v) => v.id === variantParam || v.label === variantParam
+      );
+      if (matched) return matched;
+    }
+  }
+  return product.variants[0];
+}
 
 interface ProductDetailViewProps {
   product: CatalogProduct;
@@ -55,12 +70,13 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   onNavigate
 }) => {
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
-    product.variants.length > 0 ? product.variants[0] : null
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(() =>
+    resolveInitialVariant(product)
   );
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<'specs' | 'shipping' | 'norma' | null>('specs');
+  const lastTrackedContentRef = useRef<string>('');
 
   // Reviews state
   const reviewsSectionRef = useRef<HTMLElement>(null);
@@ -95,13 +111,49 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
   useEffect(() => {
     setSelectedImageIdx(0);
-    setSelectedVariant(product.variants.length > 0 ? product.variants[0] : null);
+    setSelectedVariant(resolveInitialVariant(product));
     setQuantity(1);
     setJustAdded(false);
     setShowReviewForm(false);
     setReviewSubmitted(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
+
+  // Sync ?variant= query param and fire Meta Pixel ViewContent matching catalog feed id
+  useEffect(() => {
+    const isVariantValid =
+      product.variants.length === 0
+        ? selectedVariant === null
+        : Boolean(selectedVariant && product.variants.some((v) => v.id === selectedVariant.id));
+    if (!isVariantValid) return;
+
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/producto')) {
+      const currentUrl = new URL(window.location.href);
+      if (product.variants.length > 0 && selectedVariant) {
+        if (currentUrl.searchParams.get('variant') !== selectedVariant.id) {
+          currentUrl.searchParams.set('variant', selectedVariant.id);
+          window.history.replaceState(
+            window.history.state,
+            '',
+            `${currentUrl.pathname}${currentUrl.search}`
+          );
+        }
+      } else if (currentUrl.searchParams.has('variant')) {
+        currentUrl.searchParams.delete('variant');
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${currentUrl.pathname}${currentUrl.search}`
+        );
+      }
+    }
+
+    const trackingKey = `${product.id}::${selectedVariant?.id ?? ''}`;
+    if (lastTrackedContentRef.current !== trackingKey) {
+      lastTrackedContentRef.current = trackingKey;
+      trackViewContent(product, selectedVariant);
+    }
+  }, [product, selectedVariant]);
 
   const activePrice = selectedVariant ? selectedVariant.price : product.basePrice;
   const activeSku = selectedVariant?.sku || product.sku || 'ARX-STD';
@@ -131,6 +183,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
   const handleInstantQuoteWhatsApp = () => {
     const total = activePrice * quantity;
+    trackLeadQuote(product, selectedVariant, total);
     const saved = saveQuoteToCMS({
       type: 'COTIZACION_PRODUCTO',
       clientName: 'Cliente Web ARXEM',
@@ -240,11 +293,10 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  className={`relative z-10 max-h-[76%] max-w-[78%] object-contain ${
-                    studioCutout && selectedImageIdx === 0
+                  className={`relative z-10 max-h-[76%] max-w-[78%] object-contain ${studioCutout && selectedImageIdx === 0
                       ? 'drop-shadow-[0_24px_40px_rgba(13,17,23,0.16)]'
                       : 'mix-blend-multiply'
-                  }`}
+                    }`}
                 />
               </AnimatePresence>
 
@@ -266,11 +318,10 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                     key={idx}
                     type="button"
                     onClick={() => setSelectedImageIdx(idx)}
-                    className={`w-16 h-16 rounded-2xl bg-white p-2 transition-all ${
-                      selectedImageIdx === idx
+                    className={`w-16 h-16 rounded-2xl bg-white p-2 transition-all ${selectedImageIdx === idx
                         ? 'ring-1 ring-[#0D1117]'
                         : 'opacity-50 hover:opacity-100'
-                    }`}
+                      }`}
                   >
                     <img
                       src={url}
@@ -369,11 +420,10 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                         key={v.id}
                         type="button"
                         onClick={() => setSelectedVariant(v)}
-                        className={`px-3.5 py-2 rounded-xl font-mono text-xs transition-all ${
-                          active
+                        className={`px-3.5 py-2 rounded-xl font-mono text-xs transition-all ${active
                             ? 'bg-[#0D1117] text-white font-semibold'
                             : 'bg-white text-[#0D1117]/65 hover:text-[#0D1117]'
-                        }`}
+                          }`}
                       >
                         {v.label}
                       </button>
@@ -433,11 +483,10 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                   type="button"
                   onClick={handleAdd}
                   style={{ fontFamily: "'Outfit', sans-serif" }}
-                  className={`flex-1 h-13 py-4 px-6 rounded-full text-xs uppercase tracking-[0.16em] font-extrabold transition-all flex items-center justify-center gap-2 ${
-                    justAdded
+                  className={`flex-1 h-13 py-4 px-6 rounded-full text-xs uppercase tracking-[0.16em] font-extrabold transition-all flex items-center justify-center gap-2 ${justAdded
                       ? 'bg-emerald-600 text-white'
                       : 'bg-[#0D1117] text-white hover:bg-[#0052FF]'
-                  }`}
+                    }`}
                 >
                   {justAdded ? (
                     <>
@@ -691,11 +740,10 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                             className="p-0.5"
                           >
                             <Star
-                              className={`w-4 h-4 ${
-                                r <= reviewRating
+                              className={`w-4 h-4 ${r <= reviewRating
                                   ? 'fill-[#D97706] text-[#D97706]'
                                   : 'text-[#0D1117]/20'
-                              }`}
+                                }`}
                             />
                           </button>
                         ))}
@@ -830,9 +878,8 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                         src={relCutout || rel.media[0]}
                         alt={rel.name}
                         loading="lazy"
-                        className={`max-h-[72%] max-w-[76%] object-contain transition-transform duration-500 group-hover:scale-105 ${
-                          relCutout ? 'drop-shadow-md' : 'mix-blend-multiply'
-                        }`}
+                        className={`max-h-[72%] max-w-[76%] object-contain transition-transform duration-500 group-hover:scale-105 ${relCutout ? 'drop-shadow-md' : 'mix-blend-multiply'
+                          }`}
                       />
                     </div>
                     <div className="pt-3 flex items-baseline justify-between gap-3">

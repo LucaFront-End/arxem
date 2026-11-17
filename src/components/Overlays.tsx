@@ -15,6 +15,7 @@ import {
   saveQuoteToCMS,
   openWhatsAppWithQuote
 } from '../data/taxonomyData';
+import { trackInitiateCheckout } from '../lib/metaPixel';
 
 export interface CartItem {
   id: string;
@@ -47,6 +48,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const handleCheckoutWhatsAppAndCMS = () => {
     if (items.length === 0) return;
+    trackInitiateCheckout(items, totalMXN);
     const summaryText = items
       .map((i) => `${i.quantity}x ${i.product.name} (${i.variantLabel})`)
       .join(', ');

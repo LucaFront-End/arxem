@@ -479,10 +479,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
       <IsometricCustomToggle
         onNavigate={(route) => onNavigate(route)}
         onOpenWhatsApp={(summary) =>
-          openWhatsAppWithQuote({
-            title: 'COTIZACIÓN INGENIERÍA A MEDIDA ARXEM',
-            lines: [summary]
-          })
+          openWhatsAppWithQuote(
+            `Hola *ARXEM®*, solicito *COTIZACIÓN DE INGENIERÍA A MEDIDA*:\n\n${summary}`
+          )
         }
       />
 

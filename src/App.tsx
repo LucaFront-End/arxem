@@ -17,19 +17,21 @@ import {
   SectorSlug
 } from './data/catalogData';
 import { getSavedCMSQuotes, CMSQuoteRecord } from './data/taxonomyData';
+import { slugifyProduct } from './lib/catalogFeed';
+import { trackAddToCart, trackPageView } from './lib/metaPixel';
 
 const DEFAULT_PRODUCT =
   CATALOG_PRODUCTS.find((p) => p.id.includes('b2c5150a')) || CATALOG_PRODUCTS[0];
 
-function slugifyProduct(product: CatalogProduct): string {
-  const base = (product.slug || product.name)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-  const shortId = product.id.slice(0, 8);
-  return `${base}-${shortId}`;
+function normalizeNameSlug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'producto'
+  );
 }
 
 function parsePathname(pathname: string): {
@@ -60,15 +62,18 @@ function parsePathname(pathname: string): {
     return { route: 'contacto', product: DEFAULT_PRODUCT };
   }
   if (clean.startsWith('/producto')) {
-    const slugPart = clean.replace(/^\/producto\/?/, '');
+    const slugPart = decodeURIComponent(clean.replace(/^\/producto\/?/, '')).toLowerCase();
     if (slugPart) {
-      const matched = CATALOG_PRODUCTS.find(
-        (p) =>
+      const matched = CATALOG_PRODUCTS.find((p) => {
+        const cleanShortId = p.id.replace(/^Product_/i, '').slice(0, 8).toLowerCase();
+        return (
           slugifyProduct(p) === slugPart ||
-          p.id === slugPart ||
-          slugPart.endsWith(p.id.slice(0, 8)) ||
-          p.slug === slugPart
-      );
+          p.id.toLowerCase() === slugPart ||
+          slugPart.endsWith(`-${cleanShortId}`) ||
+          // Legacy backward-compatibility for earlier `<name>-product_` URLs
+          slugPart === `${normalizeNameSlug(p.name)}-product_`
+        );
+      });
       if (matched) {
         return { route: 'producto', product: matched };
       }
@@ -131,6 +136,11 @@ export function App() {
     window.addEventListener('arxem-cms-updated', refreshCMS);
     return () => window.removeEventListener('arxem-cms-updated', refreshCMS);
   }, []);
+
+  // Track route PageViews for Meta Pixel
+  useEffect(() => {
+    trackPageView();
+  }, [activeRoute]);
 
   // Sync browser Back / Forward navigation (popstate)
   useEffect(() => {
@@ -210,6 +220,8 @@ export function App() {
         : product.variants.length > 0
         ? product.variants[0].price
         : product.basePrice;
+
+    trackAddToCart(product, label, unitPrice, 1);
 
     const itemId = `${product.id}::${label}`;
     setCartItems((prev) => {
